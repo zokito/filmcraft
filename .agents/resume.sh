@@ -19,7 +19,7 @@ tmux new-window -d -t "$TSESS" -n "$SID" -c "$WT" \
    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
    claude -p --continue \"$PROMPT\" \
      --model $MODEL \
-     --settings .agents/roles/$ROLE.json \
+     --settings $MAIN/.agents/roles/$ROLE.json \
      --permission-mode acceptEdits \
      --output-format stream-json --verbose \
      >> $STATE/$SID.stream.jsonl 2>> $STATE/$SID.err; \
