@@ -1,0 +1,5 @@
+crates/engine/**
+crates/automation/**
+apps/filmcraft-cli/**
+crates/ui-egui/src/panels/keyboard.rs
+docs/agents.md
