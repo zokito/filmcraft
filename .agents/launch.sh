@@ -31,6 +31,9 @@ PROMPT="You are worker $SID for $NAME (the zokito fork of storytold/$NAME).
 Read $BRIEF fully; it is your task. Write only inside the paths in $WS (the guard hook refuses others).
 Commit on branch $BRANCH, push it to origin (github.com/zokito/$NAME) and open one PR with
 gh pr create -R zokito/$NAME --base main --head $BRANCH. Never open a PR against storytold, never merge.
+You run headless: ending your turn ends the process. Run every cargo build/test/xtask in the
+FOREGROUND (Bash timeout 600000 ms, output to /tmp/craft-$SID/<name>.log, print only the tail);
+never use run_in_background and never stop to wait for a notification.
 Stop when every Done-when in the brief has a verbatim proof in the PR body."
 tmux new-window -d -t "$TSESS" -n "$SID" -c "$WT" \
   "CRAFT_SESSION=$SID CRAFT_ROLE=$ROLE CRAFT_WRITESET_FILE=$WT/$WS CRAFT_REPO=zokito/$NAME CLAUDE_PROJECT_DIR=$WT \
