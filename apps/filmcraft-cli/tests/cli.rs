@@ -69,6 +69,18 @@ fn exec_inspect_and_describe() {
 }
 
 #[test]
+fn exec_disabled_names_remedy() {
+    // no project open: `timeline.razor` is disabled for lack of a sequence, and the error says
+    // what to run instead of just that it can't.
+    let bad = cli(&["exec", "timeline.razor", "seconds=1"]);
+    assert_eq!(bad.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&bad.stderr);
+    assert!(stderr.contains("file.newSequence"), "{stderr}");
+    let d = json_out(&cli(&["describe", "timeline.razor"]));
+    assert!(d["disabledReason"].as_str().unwrap().contains("no sequence is open"), "{d}");
+}
+
+#[test]
 fn exec_save_as_then_reopen() {
     let dir = std::env::temp_dir().join(format!("fc-cli-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();

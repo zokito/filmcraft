@@ -87,3 +87,25 @@ fn sequence_inspect_reports_a_reversed_clip() {
     let js = s.execute("sequence.inspect", json!({})).unwrap();
     assert!(all(&js).iter().all(|(_, reversed)| !reversed));
 }
+
+/// `sequence.inspect` reports caption tracks and their captions next to `markers`, so an agent can
+/// read subtitles without a separate round trip through `captions.list`.
+#[test]
+fn sequence_inspect_reports_caption_tracks() {
+    let mut s = Session::default();
+    s.execute("file.openDemoProject", json!({})).unwrap();
+    s.execute("captions.newTrack", json!({"format": "Subtitle", "name": "English", "language": "en"})).unwrap();
+    s.execute("playhead.set", json!({"seconds": 1.0})).unwrap();
+    let r = s.execute("captions.add", json!({"text": "Čćžšđ test", "durationSeconds": 2.0})).unwrap();
+    let caption = r["caption"].as_u64().unwrap();
+
+    let js = s.execute("sequence.inspect", json!({})).unwrap();
+    let tracks = js["captionTracks"].as_array().unwrap();
+    assert_eq!(tracks.len(), 1);
+    assert_eq!(tracks[0]["name"], "English");
+    assert_eq!(tracks[0]["language"], "en");
+    let captions = tracks[0]["captions"].as_array().unwrap();
+    assert_eq!(captions.len(), 1);
+    assert_eq!(captions[0]["id"], caption);
+    assert_eq!(captions[0]["text"], "Čćžšđ test");
+}
