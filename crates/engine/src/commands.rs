@@ -73,11 +73,11 @@ fn has_recovery(s: &Session) -> std::result::Result<(), String> {
 }
 
 pub(crate) fn has_seq(s: &Session) -> std::result::Result<(), String> {
-    s.active_sequence().map(|_| ()).ok_or_else(|| "no sequence is open".into())
+    s.active_sequence().map(|_| ()).ok_or_else(|| "no sequence is open (run file.newSequence or sequence.open, or pass --project)".into())
 }
 pub(crate) fn has_selection(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
-    if s.state.selection.is_empty() { Err("no clips selected".into()) } else { Ok(()) }
+    if s.state.selection.is_empty() { Err("no clips selected (pass clips=[id] or select clips)".into()) } else { Ok(()) }
 }
 /// Clips or captions selected (Clear / Ripple Delete work on either).
 fn has_any_selection(s: &Session) -> std::result::Result<(), String> {
@@ -86,7 +86,7 @@ fn has_any_selection(s: &Session) -> std::result::Result<(), String> {
 }
 fn has_source(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
-    s.state.source_item.map(|_| ()).ok_or_else(|| "no clip in the Source monitor".into())
+    s.state.source_item.map(|_| ()).ok_or_else(|| "no clip in the Source monitor (run source.open)".into())
 }
 fn can_undo(s: &Session) -> std::result::Result<(), String> {
     if s.history.can_undo() { Ok(()) } else { Err("nothing to undo".into()) }
@@ -95,15 +95,15 @@ fn can_redo(s: &Session) -> std::result::Result<(), String> {
     if s.history.can_redo() { Ok(()) } else { Err("nothing to redo".into()) }
 }
 fn has_in_out(s: &Session) -> std::result::Result<(), String> {
-    let seq = s.active_sequence().ok_or("no sequence is open")?;
-    if seq.mark_in.is_some() || seq.mark_out.is_some() { Ok(()) } else { Err("mark an In or Out point first".into()) }
+    let seq = s.active_sequence().ok_or("no sequence is open (run file.newSequence or sequence.open, or pass --project)")?;
+    if seq.mark_in.is_some() || seq.mark_out.is_some() { Ok(()) } else { Err("mark an In or Out point first (run markers.markIn or markers.markOut)".into()) }
 }
 fn has_previews(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
     if s.previews.count() == 0 { Err("there are no render files".into()) } else { Ok(()) }
 }
 pub(crate) fn has_project_selection(s: &Session) -> std::result::Result<(), String> {
-    if s.state.project_selection.is_empty() { Err("select an item in the Project panel".into()) } else { Ok(()) }
+    if s.state.project_selection.is_empty() { Err("select an item in the Project panel (pass items=[id] or run project.select)".into()) } else { Ok(()) }
 }
 fn has_clipboard(s: &Session) -> std::result::Result<(), String> {
     has_seq(s)?;
@@ -2467,7 +2467,8 @@ fn build() -> Vec<CommandSpec> {
                     .iter()
                     .map(|c| {
                         let all: Vec<&str> = s.shortcuts.for_command(c.id).iter().map(|b| b.keys.as_str()).collect();
-                        json!({"id": c.id, "label": c.label, "menu": c.menu, "shortcut": s.shortcuts.primary(c.id), "shortcuts": all, "defaultShortcut": c.shortcut, "params": c.params, "enabled": (c.enabled)(s).is_ok()})
+                        let disabled_reason = (c.enabled)(s).err();
+                        json!({"id": c.id, "label": c.label, "menu": c.menu, "shortcut": s.shortcuts.primary(c.id), "shortcuts": all, "defaultShortcut": c.shortcut, "params": c.params, "enabled": disabled_reason.is_none(), "disabledReason": disabled_reason})
                     })
                     .collect(),
             ))
@@ -3132,6 +3133,10 @@ pub fn inspect_sequence(s: &Session, id: ItemId, q: &filmcraft_project::Sequence
         "out": q.mark_out.map(|t| t.0),
         "split": q.split,
         "markers": q.markers.iter().map(|m| json!({"id": m.id.0, "start": m.start.0, "duration": m.duration.0, "kind": format!("{:?}", m.kind), "name": m.name, "comment": m.comment, "color": m.color.name()})).collect::<Vec<_>>(),
+        "captionTracks": q.caption_tracks.iter().map(|t| json!({
+            "id": t.id.0, "name": t.name, "language": if t.language.is_empty() { None } else { Some(t.language.clone()) },
+            "captions": t.captions.iter().map(|c| json!({"id": c.id.0, "start": c.start.0, "duration": c.duration.0, "text": c.text})).collect::<Vec<_>>(),
+        })).collect::<Vec<_>>(),
         "video": q.video_tracks.iter().map(tr).collect::<Vec<_>>(),
         "audio": q.audio_tracks.iter().map(tr).collect::<Vec<_>>(),
         "selection": s.state.selection.iter().map(|c| c.0).collect::<Vec<_>>(),

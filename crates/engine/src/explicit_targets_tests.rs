@@ -47,7 +47,7 @@ fn replace_from_bin_takes_an_explicit_item_and_clips_without_any_selection() {
     assert_ne!(c.item, dunes);
     // nothing named, nothing selected: disabled, for the menus and for a caller alike
     assert!(!s.is_enabled("clip.replaceFromBin"));
-    assert_eq!(disabled(s.execute("clip.replaceFromBin", json!({}))), "no clips selected");
+    assert_eq!(disabled(s.execute("clip.replaceFromBin", json!({}))), "no clips selected (pass clips=[id] or select clips)");
     // the clip is named but the replacement is not: still the Project panel's call
     assert_eq!(disabled(s.execute("clip.replaceFromBin", json!({"clips": [c.id.0]}))), "select a clip in the Project panel");
     // both named: runs with no timeline and no Project-panel selection
@@ -102,7 +102,7 @@ fn clip_commands_take_explicit_clips_without_a_selection() {
     s.execute("edit.redo", json!({})).unwrap();
     assert!(!clip(&s, a.id).unwrap().enabled);
     // `clip.enable` documents `clips` only: a key it does not document is not a named target
-    assert_eq!(disabled(s.execute("clip.enable", json!({"clip": a.id.0}))), "no clips selected");
+    assert_eq!(disabled(s.execute("clip.enable", json!({"clip": a.id.0}))), "no clips selected (pass clips=[id] or select clips)");
     // Paste Attributes: naming the clips lifts only the selection condition, not the clipboard one
     assert_eq!(disabled(s.execute("edit.pasteAttributes", json!({"clips": [b.id.0]}))), "copy a clip first");
     s.execute("timeline.select", json!({"clips": [a.id.0]})).unwrap();
@@ -125,7 +125,7 @@ fn naming_nothing_usable_does_not_enable_a_command() {
     }
     assert_eq!(disabled(s.execute("clip.replaceFromBin", json!({"clips": [v1(&s)[0].id.0], "item": 987_654_321u64}))), "select a clip in the Project panel");
     // `edit.cut` takes no `clips`: it works on the selection only
-    assert_eq!(disabled(s.execute("edit.cut", json!({"clips": [v1(&s)[0].id.0]}))), "no clips selected");
+    assert_eq!(disabled(s.execute("edit.cut", json!({"clips": [v1(&s)[0].id.0]}))), "no clips selected (pass clips=[id] or select clips)");
     assert!(std::sync::Arc::ptr_eq(&before, &s.project), "nothing was edited");
 }
 
@@ -135,7 +135,7 @@ fn link_and_speed_take_explicit_clips_without_a_selection() {
     let (v, au) = (v1(&s)[0].clone(), a1(&s)[0].clone());
     for id in ["clip.link", "clip.speedDuration"] {
         assert!(!s.is_enabled(id));
-        assert_eq!(disabled(s.execute(id, json!({}))), "no clips selected");
+        assert_eq!(disabled(s.execute(id, json!({}))), "no clips selected (pass clips=[id] or select clips)");
     }
     // Link toggles the named pair
     let was = v.link.is_some() && v.link == au.link;
@@ -163,8 +163,11 @@ fn link_and_speed_take_explicit_clips_without_a_selection() {
 fn naming_targets_lifts_only_the_selection_condition() {
     // no sequence: named clips cannot stand in for one
     let mut empty = Session::default();
-    assert_eq!(disabled(empty.execute("edit.clear", json!({"clips": [1]}))), "no sequence is open");
-    assert_eq!(disabled(empty.execute("clip.speedDuration", json!({"clips": [1], "speed": 50}))), "no sequence is open");
+    assert_eq!(disabled(empty.execute("edit.clear", json!({"clips": [1]}))), "no sequence is open (run file.newSequence or sequence.open, or pass --project)");
+    assert_eq!(
+        disabled(empty.execute("clip.speedDuration", json!({"clips": [1], "speed": 50}))),
+        "no sequence is open (run file.newSequence or sequence.open, or pass --project)"
+    );
 
     let mut s = demo();
     let a = v1(&s)[0].clone();
@@ -174,4 +177,19 @@ fn naming_targets_lifts_only_the_selection_condition() {
     s.execute("timeline.setTrack", json!({"track": "V1", "locked": true})).unwrap();
     let _ = s.execute("edit.clear", json!({"clips": [a.id.0]}));
     assert!(clip(&s, a.id).is_some(), "a clip on a locked track is not removed");
+}
+
+/// `command.list` rows carry the predicate's message as `disabledReason`, so `describe` and
+/// `commands --json` can tell a caller why a disabled command is disabled, not just that it is.
+#[test]
+fn command_list_reports_disabled_reason() {
+    let mut s = demo(); // selections cleared: clip.enable has no clips to act on
+    let list = s.execute("command.list", json!({})).unwrap();
+    let row = list.as_array().unwrap().iter().find(|c| c["id"] == "clip.enable").unwrap();
+    assert_eq!(row["enabled"], false);
+    assert_eq!(row["disabledReason"], "no clips selected (pass clips=[id] or select clips)");
+
+    let row = list.as_array().unwrap().iter().find(|c| c["id"] == "edit.selectAll").unwrap();
+    assert_eq!(row["enabled"], true, "a sequence is open");
+    assert_eq!(row["disabledReason"], serde_json::Value::Null);
 }
